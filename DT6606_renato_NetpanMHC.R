@@ -2,27 +2,48 @@ if (!requireNamespace("BiocManager", quietly = TRUE))
   install.packages("BiocManager")
 
 BiocManager::install("UniProt.ws")
+install.packages("data.table")
+install.packages("styler")
+install.packages("lintr")
 library(UniProt.ws)
 library(data.table)
-#its returning an error because some of the gene annotation contains extra comma's (for some fucking reason. 
-#maybe its easier to output .VFC and then bring it back to .CSV?)
-dat <- fread(file = "~/NGS/Blood_Renato_DT6606_WES/variant_calling/blood_SNP_calling.Somatic.hc.mm10_multianno", sep = "\t", fill = T, header = T)
-usedat <- dat[-(1:30),1:10]
-nonsynonmut <- usedat[ExonicFunc.refGene =="nonsynonymous SNV"] #gather nonsynonymous, exonic variations.
+library(lintr)
 
-#we want to have a .csv with gene name , ref, alt, AAmutation, 9AA-mut-9AA
+# load in annotated whole exsome sequencing single nucleotide variation data.
+read.table("~/Documents/GitHub/gits/DT6606_variants_sub.tsv", sep = "\t", fill = T)
+dat <- fread(file = "~/Documents/GitHub/gits/DT6606_variants_sub.tsv",
+  sep2 = ";",
+  fill = F,
+  na.strings ="NA",
+  check.names = T)
+# remove .VCF data in the first top 30 rows.
+# the length of these might differ depending on the pipeline used.
+# to do: give an optoin to either work with VCF or TSV/CSV files.
+usedat <- dat[ -(1:30)]
+# gather nonsynonymous, exonic variations.
+nonsynonmut <- usedat[ExonicFunc.refGene == "nonsynonymous SNV"]
 
-#for that we need to query uniprot to get the AA surrounding the mutation. step one is acquiring the AAmutation for each gene.
-rsubstr <-  function(x,n){
-  substring(x,nchar(x)-n+1)
+
+rsubstr <- function(x,n) {
+# substring only works from left to right.
+# this function grabs n characters from the end of the string.
+
+  substring(x, nchar(x) - n + 1)
 }
 
-AAmutsmall <- nonsynonmut[,sub(x=AAChange.refGene, replacement = "", pattern = ".*(?=.{50}$)", perl = T)]
-AAmustsep <- sub(x = AAmutsmall, replacement = "", pattern = ".*," )
-AAsplit <- strsplit(x = AAmustsep, split =":")
+#the
+AAmutsmall <- nonsynonmut[ ,sub(x = AAChange.refGene,
+  replacement = "",
+  pattern = ".*(?=.{50}$)",
+  perl = T)]
+AAmustsep <- sub(x = AAmutsmall,
+  replacement = "",
+  pattern = ".*,")
+AAsplit <- strsplit(x = AAmustsep, split = ":")
 AAsplit <- as.data.table(AAsplit)
-NM <- unlist(AAsplit[2,], use.names = F)
-mut <- unlist(AAsplit[5,], use.names = F)
+
+NM <- unlist(AAsplit[2, ], use.names = F)
+mut <- unlist(AAsplit[5, ], use.names = F)
 mutpos <- as.numeric(gsub(".*?([0-9]+).*", "\\1", x = mut))
 from <- substr(mut, 3,3)
 to <- sapply(mut, function(x){
@@ -79,22 +100,22 @@ for(i in seq_along(AAdata[,1])){
     leftmer9 <- c(substring(AAdata[i,"SEQUENCE"], first = AAdata[i,"mutpos"]+1, last = AAdata[i,"mutpos"]+8))
     #select +9AA
     leftmer10 <- c(substring(AAdata[i,"SEQUENCE"], first = AAdata[i,"mutpos"]+1, last = AAdata[i,"mutpos"]+9))
-    
+
     #stitch them together
     comb8 <- paste(rightmer8, AAdata[i,"to"], leftmer8, sep = "")
     comb9 <- paste(rightmer9, AAdata[i,"to"], leftmer9, sep = "")
     comb10 <- paste(rightmer10, AAdata[i,"to"], leftmer10, sep = "")
-    
+
     mer8 <- c(mer8, comb8)
     mer9 <- c(mer9, comb9)
     mer10 <- c(mer10, comb10)
-    
+
   }else{
     mer8 <- c(mer8, "AA not found in sequence")
     mer9 <- c(mer9, "AA not found in sequence")
     mer10 <- c(mer10, "AA not found in sequence")
   }
- 
+
 }
 AAdata2 <- cbind(AAdata, mer8, mer9, mer10)
 
