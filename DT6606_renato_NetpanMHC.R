@@ -10,18 +10,23 @@ library(data.table)
 library(lintr)
 
 # load in annotated whole exsome sequencing single nucleotide variation data.
-read.table("~/Documents/GitHub/gits/DT6606_variants_sub.tsv", sep = "\t", fill = T)
+read.table("~/Documents/GitHub/gits/DT6606_variants_sub.tsv",
+  sep = "\t",
+  fill = T)
+
 dat <- fread(file = "~/Documents/GitHub/gits/DT6606_variants_sub.tsv",
   sep2 = ";",
   fill = F,
   na.strings ="NA",
-  check.names = T)
+  check.names = T,
+  header = T)
 # remove .VCF data in the first top 30 rows.
 # the length of these might differ depending on the pipeline used.
 # to do: give an optoin to either work with VCF or TSV/CSV files.
 usedat <- dat[ -(1:30)]
 # gather nonsynonymous, exonic variations.
 nonsynonmut <- usedat[ExonicFunc.refGene == "nonsynonymous SNV"]
+
 
 
 rsubstr <- function(x,n) {
@@ -31,50 +36,156 @@ rsubstr <- function(x,n) {
   substring(x, nchar(x) - n + 1)
 }
 
-#the
+# multiple NCBI gene variants and corresponding CNV location
+# are located in the same column, we extract the last 50 digits and stringsplit
+# this the final reference and mutation are available.
+# TO DO: grab all combinations and use those downstream in case no sequence and
+# AA can be found for the first reference in the UniProt database.
 AAmutsmall <- nonsynonmut[ ,sub(x = AAChange.refGene,
   replacement = "",
   pattern = ".*(?=.{50}$)",
   perl = T)]
+
 AAmustsep <- sub(x = AAmutsmall,
   replacement = "",
   pattern = ".*,")
+
 AAsplit <- strsplit(x = AAmustsep, split = ":")
 AAsplit <- as.data.table(AAsplit)
 
-NM <- unlist(AAsplit[2, ], use.names = F)
+# grab the NCBI refseq reference, gene name, original amino acid,
+# location of the mutation and mutation.
+NM  <- unlist(AAsplit[2, ], use.names = F)
 mut <- unlist(AAsplit[5, ], use.names = F)
-mutpos <- as.numeric(gsub(".*?([0-9]+).*", "\\1", x = mut))
-from <- substr(mut, 3,3)
-to <- sapply(mut, function(x){
-  substring(x,nchar(x))
-}, USE.NAMES = F)
-name <- unlist(AAsplit[1,], use.names=F)
+mutpos <- as.numeric(gsub(".*?([0-9]+).*",
+  "\\1",
+  x = mut))
 
-#select m. musculus uniprot datbase for AA sequence extraction.
+from <- substr(mut, 3, 3)
+to <- sapply(mut, function(x) {
+  substring(x, nchar(x))
+  }
+  , USE.NAMES = F)
+name <- unlist(AAsplit[1, ], use.names = F)
+
+
+# select m. musculus uniprot datbase for AA sequence extraction.
 mouseUp <- UniProt.ws(10090)
-columns(mouseUp)
-mouseke <- keys(mouseUp, "REFSEQ_NUCLEOTIDE")#determine all refseq names
-mouseke2 <- sub(x = mouseke, pattern = "\\..*", replacement = "") #remove .# version info
-keymou <- match(NM,mouseke2) #match our NM_######## linked to non-synonymous mutations to the reseq keys
-keymouref <- mouseke[keymou] #select keys of each mutation
-
+# determine all refseq names
+mouseke <- keys(mouseUp, "REFSEQ_NUCLEOTIDE")
+# remove .# version info
+mouseke2 <- sub(x = mouseke,
+   pattern = "\\..*",
+   replacement = "")
+# match our NM_######## linked to non-synonymous mutations to the refseq keys
+keymou <- match(NM, mouseke2)
+# select keys of each mutation as they appear in the uniprot dataset.
+# this step is neccesary as we are missing the version info.
+keymouref <- mouseke[keymou]
 columnref <- c("UNIPROTKB")
-res <- select(x = mouseUp, keys = keymouref , columnref, keytype =  "REFSEQ_NUCLEOTIDE")#get uniprotKB identifier (as not all refseq identfiers are linked to a sequence
+
+# get uniprotKB identifier
+# as not all refseq identfiers are linked to a sequence
+# some refseq nucleotides are converted to different UNIPROTKB identifers
+# in this step we idetify these cases
+res <- select(x = mouseUp,
+  keys = keymouref,
+  columnref,
+  keytype = "REFSEQ_NUCLEOTIDE")
+
+# we can then extract the correct UNIPROT id
 columns <- c( "REVIEWED", "SEQUENCE")
 uniprot <- res[,"UNIPROTKB"]
-protsub <- sub(x=uniprot, pattern = "(.*->) ", replacement = "", perl =T)
-protsubsub <- sub(x=protsub, patter = "(-.*)", replacement ="", perl = T)
+protsub <- sub(uniprot,
+  pattern = "(.*->)",
+  replacement = "",
+  perl =T)
 
-resref <- cbind(res,protsubsub)
-res2 <- select(x=mouseUp, keys = resref[,3], columns, keytype = "UNIPROTKB") #select sequences of eacch uniprot IDs.
+protsubsub <- sub(protsub,
+  pattern = "(-.*)",
+  replacement = "",
+  perl = T)
+
+# select sequences of eacch uniprot IDs.
+res2 <- select(x=mouseUp,
+  keys = resref[, 3],
+  columns,
+  keytype = "UNIPROTKB")
+
 #trace back uniprotID linked sequences with our NM with.
-NMsub <- sub(x = resref[,1], pattern = "\\..*", replacement = "")
+NMsub <- sub(x = resref[, 1],
+  pattern = "\\..*",
+  replacement = "")
+
+#build up final table
+resref <- cbind(res, protsubsub)
 resref_fin <- cbind(NMsub, resref, res2)
 
-NMmatch <- match(NM,resref_fin[,1])
-AAmat <- resref_fin[NMmatch,c(-3, -4)]
-AAdata <- cbind(name, NM, mut, from, to, mutpos, AAmat)
+NMmatch <- match(NM,resref_fin[, 1])
+AAmat <- resref_fin[NMmatch, c(-3, -4)]
+AAdata <- cbind(name,
+  NM,
+  mut,
+  from,
+  to,
+  mutpos,
+  AAmat)
+
+n_char_extract <- function(x, n, loc, mut = "X") {
+  # extracts +n and -n characters surrouding a location in a vector.
+  #
+  # Args:
+  #   x: A vector where the characters will be extracted from
+  #   n: The amount of characters to be extracted from the vect,
+  #      should be a positive integer.
+  #   loc: Numeric location in the vector from where
+  #      surrounding characters are extracted.
+  #   replace: If TRUE, replaces the character at position loc
+  #      with the character supplied in mut. Default is TRUE
+  #   mut: character that replaces original character in location loc.
+  #
+  # Returns:
+  #   A vector of 2n+1 length extracted from vector x.
+  mer <- c()
+  if (is.na(x)) {
+    stop("x is not a character or numeric vector, or x is not supplied.")
+  }else{
+     Rmer <- substring(x, first = loc - n, last = loc - 1)
+     Lmer <- substring(x, first = loc + 1, last = loc + n)
+  }
+
+  if (replace == TRUE) {
+    mid <- mut
+  }else{
+    mid <- substring(x, first = loc, last = loc)
+  }
+
+  mer <- c(Rmer + mid + Lmer)
+}
+
+
+Uniprot_proteinQC <- function (data, data2, seq, loc, expectedAA){
+  # qualit control function that checks if the the protein sequence was
+  # successfully found and if the expected amino acid is in the right place.
+  #
+  # Args:
+  #   data: Data.table with protein names, extracted refseq IDs, Uniprot IDs
+  #         and protein sequences.
+  #   data2: initial VCF or tab delimited data containing the CNV and annotation.
+  #   seq: column in data containing the protein sequences.
+  #   loc: column in data containing the mutation site.
+  #
+  # Returns:
+  #   A revised data.table with adjusted protein sequences where previously
+  #   sequences were missing or incorrect.
+  for(i in seq_along(AAdata[,1])){
+
+    if (is.na(AAdata[i,seq])){ #  first attempt to resolve all NA sequences.
+
+    }
+    # subsequently check if found protein sequences contain the expected AA.
+}
+
 
 #check for each protein sequence if the expected AA(from) is in position mut.
 mer8 <- c()
