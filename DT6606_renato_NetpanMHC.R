@@ -46,12 +46,41 @@ AAmutsmall <- nonsynonmut[ ,sub(x = AAChange.refGene,
   pattern = ".*(?=.{50}$)",
   perl = T)]
 
+# Dit geeft alle info die ik nodig heb. een list maken van elke column? eerste list proberen, is.na? volgende element in de list list, zelfde locatie proberen etc.
+AAmutsplit <- strsplit(nonsynonmut[, AAChange.refGene],
+  ",",
+  perl = T)
+maxlength <- max(unlist(aalistlengths))
+
+aasplit <- lapply(AAmutsplit, function(x) {
+  #print(x[i]) #  apply to first elementin AAmusplit first. if that doesnt work, check if the second one exists, if not: post NA, if it does, try again.
+  strsplit(x, split = ":")
+})
+
+# TO DO: add maxlength to give the maximum number of cycles per mutation.
+#        create while (sequence is NA AND k> max number of cycles, k +5 (to the new NM_####)) loop and run again.
+lapply(aasplit, function(x) {
+  unit1 <- unlist(x)[2] #hier neemt hij alleen de eerste van elke list.
+  k=2
+#  sapply(unit1, function(i) {
+  #  match(i[2], )
+  #}
+})
+
+
+firstele <- lapply(aasplit, "[[", 1)
+
+aalistlengths <- lapply(AAmutsplit, length)
+
+AAmutsplit[[8]][2]
+class(AAmutsplit)
+str(AAmutsplit)
+length(AAmutsplit)
 AAmustsep <- sub(x = AAmutsmall,
   replacement = "",
-  pattern = ".*,")
+  pattern = ".*,")sapply(AAmutsplit, function(x) {
 
-AAsplit <- strsplit(x = AAmustsep, split = ":")
-AAsplit <- as.data.table(AAsplit)
+
 
 # grab the NCBI refseq reference, gene name, original amino acid,
 # location of the mutation and mutation.
@@ -106,6 +135,8 @@ protsubsub <- sub(protsub,
   replacement = "",
   perl = T)
 
+resref <- cbind(res, protsubsub)
+
 # select sequences of eacch uniprot IDs.
 res2 <- select(x=mouseUp,
   keys = resref[, 3],
@@ -118,7 +149,6 @@ NMsub <- sub(x = resref[, 1],
   replacement = "")
 
 #build up final table
-resref <- cbind(res, protsubsub)
 resref_fin <- cbind(NMsub, resref, res2)
 
 NMmatch <- match(NM,resref_fin[, 1])
@@ -131,7 +161,7 @@ AAdata <- cbind(name,
   mutpos,
   AAmat)
 
-n_char_extract <- function(x, n, loc, mut = "X") {
+Ncharextract <- function(x, n, loc, mut = "X") {
   # extracts +n and -n characters surrouding a location in a vector.
   #
   # Args:
@@ -164,23 +194,23 @@ n_char_extract <- function(x, n, loc, mut = "X") {
 }
 
 
-Uniprot_proteinQC <- function (data, data2, seq, loc, expectedAA){
+UniproteinQC <- function (data, data2, seqcol, loc, expectedAA){
   # qualit control function that checks if the the protein sequence was
   # successfully found and if the expected amino acid is in the right place.
   #
   # Args:
   #   data: Data.table with protein names, extracted refseq IDs, Uniprot IDs
   #         and protein sequences.
-  #   data2: initial VCF or tab delimited data containing the CNV and annotation.
-  #   seq: column in data containing the protein sequences.
+  #   data2: Initial VCF or .tsv data containing the CNV and annotation.
+  #   seqcol: column in data containing the protein sequences.
   #   loc: column in data containing the mutation site.
   #
   # Returns:
   #   A revised data.table with adjusted protein sequences where previously
   #   sequences were missing or incorrect.
-  for(i in seq_along(AAdata[,1])){
+  for (i in seq(along = data)) {
 
-    if (is.na(AAdata[i,seq])){ #  first attempt to resolve all NA sequences.
+    if (is.na(AAdata[i,seqcol])){ #  first attempt to resolve all NA sequences.
 
     }
     # subsequently check if found protein sequences contain the expected AA.
