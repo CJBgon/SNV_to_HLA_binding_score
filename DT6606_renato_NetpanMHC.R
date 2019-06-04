@@ -2,12 +2,14 @@ if (!requireNamespace("BiocManager", quietly = TRUE))
   install.packages("BiocManager")
 
 BiocManager::install("UniProt.ws")
+BiocManager::install("biomaRt")
 install.packages("data.table")
 install.packages("styler")
-install.packages("lintr")
+
+
 library(UniProt.ws)
 library(data.table)
-library(lintr)
+library(biomaRt)
 
 # load in annotated whole exsome sequencing single nucleotide variation data.
 read.table("~/Documents/GitHub/gits/DT6606_variants_sub.tsv",
@@ -41,64 +43,72 @@ rsubstr <- function(x,n) {
 # this the final reference and mutation are available.
 # TO DO: grab all combinations and use those downstream in case no sequence and
 # AA can be found for the first reference in the UniProt database.
-AAmutsmall <- nonsynonmut[ ,sub(x = AAChange.refGene,
+AAmutsmall <- nonsynonmut[, sub(x = AAChange.refGene,
   replacement = "",
   pattern = ".*(?=.{50}$)",
   perl = T)]
 
-# Dit geeft alle info die ik nodig heb. een list maken van elke column? eerste list proberen, is.na? volgende element in de list list, zelfde locatie proberen etc.
+# We take all NM options and locations per SNV
+# While this might increase computational cost we don't need to run a loop to
+# check if every refseq ID has resulted in a protein sequence
+# This increases the change of finding the correct protein sequence in UniProt
+# At the end we'll filter for unique peptides
 AAmutsplit <- strsplit(nonsynonmut[, AAChange.refGene],
   ",",
   perl = T)
-maxlength <- max(unlist(aalistlengths))
 
+# The AAChange.refGene are separated by ":", we need each in a seperate column
 aasplit <- lapply(AAmutsplit, function(x) {
-  #print(x[i]) #  apply to first elementin AAmusplit first. if that doesnt work, check if the second one exists, if not: post NA, if it does, try again.
   strsplit(x, split = ":")
 })
 
+# turn into a data.frame instead of data.table or unlist as we need each list
+# element as a seperate column
+dfaasplit <- as.data.frame(aasplit,
+  stringsAsFactors = F)
+
+dfaasplit <- t(dfaasplit)
+
 # TO DO: add maxlength to give the maximum number of cycles per mutation.
 #        create while (sequence is NA AND k> max number of cycles, k +5 (to the new NM_####)) loop and run again.
-lapply(aasplit, function(x) {
-  unit1 <- unlist(x)[2] #hier neemt hij alleen de eerste van elke list.
-  k=2
+#lapply(aasplit, function(x) {
+#  unit1 <- unlist(x)[2] #hier neemt hij alleen de eerste van elke list.
+#  k=2
 #  sapply(unit1, function(i) {
   #  match(i[2], )
   #}
-})
+#})
 
 
-firstele <- lapply(aasplit, "[[", 1)
+#firstele <- lapply(aasplit, "[[", 1)
 
-aalistlengths <- lapply(AAmutsplit, length)
+#aalistlengths <- lapply(AAmutsplit, length)
 
-AAmutsplit[[8]][2]
-class(AAmutsplit)
-str(AAmutsplit)
-length(AAmutsplit)
-AAmustsep <- sub(x = AAmutsmall,
-  replacement = "",
-  pattern = ".*,")sapply(AAmutsplit, function(x) {
+#AAmutsplit[[8]][2]
+#class(AAmutsplit)
+#str(AAmutsplit)
+#length(AAmutsplit)
+#AAmustsep <- sub(x = AAmutsmall,
+#  replacement = "",
+#  pattern = ".*,")sapply(AAmutsplit, function(x) {
 
 
 
 # grab the NCBI refseq reference, gene name, original amino acid,
 # location of the mutation and mutation.
-NM  <- unlist(AAsplit[2, ], use.names = F)
-mut <- unlist(AAsplit[5, ], use.names = F)
+NM  <- unlist(dfaasplit[, 3], use.names = F)
+mut <- unlist(dfaasplit[, 6], use.names = F)
 mutpos <- as.numeric(gsub(".*?([0-9]+).*",
   "\\1",
   x = mut))
-
 from <- substr(mut, 3, 3)
 to <- sapply(mut, function(x) {
   substring(x, nchar(x))
   }
   , USE.NAMES = F)
-name <- unlist(AAsplit[1, ], use.names = F)
+name <- unlist(dfaasplit[1, ], use.names = F)
 
-
-# select m. musculus uniprot datbase for AA sequence extraction.
+# select m. musculus uniprot datbase for AA sequence extraction.----
 mouseUp <- UniProt.ws(10090)
 # determine all refseq names
 mouseke <- keys(mouseUp, "REFSEQ_NUCLEOTIDE")
@@ -135,7 +145,7 @@ protsubsub <- sub(protsub,
   replacement = "",
   perl = T)
 
-resref <- cbind(res, protsubsub)
+resref <- cbind(res, protsub)
 
 # select sequences of eacch uniprot IDs.
 res2 <- select(x=mouseUp,
@@ -143,15 +153,15 @@ res2 <- select(x=mouseUp,
   columns,
   keytype = "UNIPROTKB")
 
-#trace back uniprotID linked sequences with our NM with.
+# trace back uniprotID linked sequences with our NM with.
 NMsub <- sub(x = resref[, 1],
   pattern = "\\..*",
   replacement = "")
 
-#build up final table
+# build up final table
 resref_fin <- cbind(NMsub, resref, res2)
 
-NMmatch <- match(NM,resref_fin[, 1])
+NMmatch <- match(unlist(dfaasplit[2 ,]),resref_fin[, 1],)
 AAmat <- resref_fin[NMmatch, c(-3, -4)]
 AAdata <- cbind(name,
   NM,
@@ -160,6 +170,48 @@ AAdata <- cbind(name,
   to,
   mutpos,
   AAmat)
+#end-----
+
+# biomart approach
+mart = useMart("ensembl", dataset="mmusculus_gene_ensembl")
+listAttributes(mart)
+searchAttributes(mart, pattern = "symbol")
+searchAttributes(mart, pattern = c("peptide"))
+searchFilters(mart, pattern = "mgi")
+annot <- getBMlist(attributes =
+  "ensembl_gene_id",
+  "refseq_mrna",
+  "peptide",
+  filters = "refseq_mrna",
+  values  = NM,
+   mart=mart)
+
+martseq_nm <- getSequence(id = NM,
+  type = "refseq_mrna",
+  seqType = "peptide",
+  mart = mart,
+  verbose = FALSE)
+# how many will return if I use simple gene names?
+martseq_mgi <- getSequence(id = name,
+  type = "mgi_symbol",
+  seqType = "peptide",
+  mart = mart)
+
+length(unique())
+length(unique(NM))#30 unique refseq codes
+length(unique(martseq_nm[, 2])) #24/30
+length(unique(martseq_mgi[, 2])) #17/30 met mgi_symbol
+length(unique(resref_fin[,7])) #19/30 met uniprotID.
+
+# using names doesn't really work because of transcript variants.
+# we should annotate into ENSGM and ENSTM. those should always net the correct
+# protein sequence.
+martseqmgi2 <- martseq_mgi[!martseq_mgi[, 1] == "Sequence unavailable", ]
+
+#lets continue with the resref_fin sequences.
+
+resref_fin
+
 
 Ncharextract <- function(x, n, loc, mut = "X") {
   # extracts +n and -n characters surrouding a location in a vector.
