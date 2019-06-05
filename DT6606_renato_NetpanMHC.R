@@ -187,8 +187,8 @@ annot <- getBMlist(attributes =
   values  = NM,
    mart=mart)
 
-AAdata[8, 11] <- NA
-for (i in seq_along(AAdata)) {
+AAdata[9, 11] <- NA
+for (i in seq_along(AAdata[,1])) {
   if (is.na(AAdata[i, 11])) { #als er geen sequence is dan
     martseq_nm <- getSequence(id = unlist(AAdata[i, 2], use.names = F), #zoek op mrna
       type = "refseq_mrna",
@@ -212,14 +212,7 @@ for (i in seq_along(AAdata)) {
 
     }
   }
-
-dim(AAdata)
-str(AAdata)
-rm(martseq_nm)
-rm(martseq_mgi)
-
-
-
+  
 martseq_nm <- getSequence(id = unlist(AAdata[1, 2], use.names = F),
   type = "refseq_mrna",
   seqType = "peptide",
