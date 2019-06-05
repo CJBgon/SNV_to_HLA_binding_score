@@ -96,8 +96,8 @@ dfaasplit <- t(dfaasplit)
 
 # grab the NCBI refseq reference, gene name, original amino acid,
 # location of the mutation and mutation.
-NM  <- unlist(dfaasplit[, 3], use.names = F)
-mut <- unlist(dfaasplit[, 6], use.names = F)
+NM  <- unlist(dfaasplit[, 2], use.names = F)
+mut <- unlist(dfaasplit[, 5], use.names = F)
 mutpos <- as.numeric(gsub(".*?([0-9]+).*",
   "\\1",
   x = mut))
@@ -106,7 +106,7 @@ to <- sapply(mut, function(x) {
   substring(x, nchar(x))
   }
   , USE.NAMES = F)
-name <- unlist(dfaasplit[1, ], use.names = F)
+name <- unlist(dfaasplit[, 1], use.names = F)
 
 # select m. musculus uniprot datbase for AA sequence extraction.----
 mouseUp <- UniProt.ws(10090)
@@ -161,7 +161,7 @@ NMsub <- sub(x = resref[, 1],
 # build up final table
 resref_fin <- cbind(NMsub, resref, res2)
 
-NMmatch <- match(unlist(dfaasplit[2 ,]),resref_fin[, 1],)
+NMmatch <- match(unlist(dfaasplit[,2 ], use.names = F),resref_fin[, 1])
 AAmat <- resref_fin[NMmatch, c(-3, -4)]
 AAdata <- cbind(name,
   NM,
@@ -169,7 +169,8 @@ AAdata <- cbind(name,
   from,
   to,
   mutpos,
-  AAmat)
+  AAmat,
+  stringsAsFactors = F)
 #end-----
 
 # biomart approach
@@ -186,13 +187,50 @@ annot <- getBMlist(attributes =
   values  = NM,
    mart=mart)
 
-martseq_nm <- getSequence(id = NM,
+AAdata[8, 11] <- NA
+for (i in seq_along(AAdata)) {
+  if (is.na(AAdata[i, 11])) { #als er geen sequence is dan
+    martseq_nm <- getSequence(id = unlist(AAdata[i, 2], use.names = F), #zoek op mrna
+      type = "refseq_mrna",
+      seqType = "peptide",
+      mart = mart,
+      verbose = F)
+
+      if (is.na(martseq_nm[1, 1]) || martseq_nm == "Sequence unavailable"){ #als er geen mra sequence is dan zoek op symbol
+        martseq_mgi <- getSequence(id = unlist(AAdata[i, 1], use.names = F),
+          type = "mgi_symbol",
+          seqType = "peptide",
+          mart = mart)
+
+          if(!is.na(martseq_mgi[1, 1]) || martseq_mgi[1,1] != "Sequence unavailable"){
+            AAdata[i, 11] <- unlist(martseq_mgi[1, 1], use.names = F)
+          }
+      }else{
+        AAdata[i, 11] <- unlist(martseq_nm[1, 1], use.names = F) #anders ver
+      }
+
+
+    }
+  }
+
+dim(AAdata)
+str(AAdata)
+rm(martseq_nm)
+rm(martseq_mgi)
+
+
+
+martseq_nm <- getSequence(id = unlist(AAdata[1, 2], use.names = F),
   type = "refseq_mrna",
   seqType = "peptide",
   mart = mart,
   verbose = FALSE)
+  str(martseq_nm)
+  is.na(martseq_nm[1,1])
+  is.null(unlist(martseq_nm[1,1]))
+
 # how many will return if I use simple gene names?
-martseq_mgi <- getSequence(id = name,
+martseq_mgi <- getSequence(id = name[1],
   type = "mgi_symbol",
   seqType = "peptide",
   mart = mart)
