@@ -5,7 +5,7 @@ BiocManager::install("UniProt.ws")
 BiocManager::install("biomaRt")
 install.packages("data.table")
 install.packages("styler")
-
+install.packages("xml2")
 
 library(UniProt.ws)
 library(data.table)
@@ -187,32 +187,35 @@ annot <- getBMlist(attributes =
   values  = NM,
    mart=mart)
 
-AAdata[9, 11] <- NA
+AAdata
+
 for (i in seq_along(AAdata[,1])) {
-  if (is.na(AAdata[i, 11])) { #als er geen sequence is dan
-    martseq_nm <- getSequence(id = unlist(AAdata[i, 2], use.names = F), #zoek op mrna
+  # If there is no sequence (NA), search biomaRt for the refeseq sequence.
+  if (is.na(AAdata[i, 11])) {
+    martseq_nm <- getSequence(id = unlist(AAdata[i, 2], use.names = F),
       type = "refseq_mrna",
       seqType = "peptide",
       mart = mart,
       verbose = F)
 
-      if (is.na(martseq_nm[1, 1]) || martseq_nm == "Sequence unavailable"){ #als er geen mra sequence is dan zoek op symbol
+      # If there is no sequence linked to the refseq id, try the  gene name.
+      if (is.na(martseq_nm[1, 1]) ||
+       martseq_nm == "Sequence unavailable"){
         martseq_mgi <- getSequence(id = unlist(AAdata[i, 1], use.names = F),
           type = "mgi_symbol",
           seqType = "peptide",
           mart = mart)
 
-          if(!is.na(martseq_mgi[1, 1]) || martseq_mgi[1,1] != "Sequence unavailable"){
+          if(!is.na(martseq_mgi[1, 1]) ||
+          martseq_mgi[1, 1] != "Sequence unavailable"){
             AAdata[i, 11] <- unlist(martseq_mgi[1, 1], use.names = F)
           }
       }else{
-        AAdata[i, 11] <- unlist(martseq_nm[1, 1], use.names = F) #anders ver
+        AAdata[i, 11] <- unlist(martseq_nm[1, 1], use.names = F)
       }
-
-
     }
   }
-  
+
 martseq_nm <- getSequence(id = unlist(AAdata[1, 2], use.names = F),
   type = "refseq_mrna",
   seqType = "peptide",
