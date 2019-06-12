@@ -3,9 +3,10 @@ library(data.table)
 library(biomaRt)
 
 
+
 rsubstr <- function(x,n) {
-# substring only works from left to right.
-# this function grabs n characters from the end of the string.
+  # substring only works from left to right.
+  # this function grabs n characters from the end of the string.
 
   substring(x, nchar(x) - n + 1)
 }
@@ -45,10 +46,35 @@ Ncharextract <- function(x, n, loc, from, replace = TRUE, mut = "X") {
   }
 
   mer <- paste(Rmer, mid, Lmer, sep = "")
-}else{
+  }else{
   mer <- "Incorrect mutation location or sequence"
+  }
 }
+
+
+formatmassager <- function (data, out, sep ="", remove1 = NULL,
+  remove2 = NULL){
+  # A vector of short peptide sequences (8, 9 and 10 mers
+  # and format them for netpanMHC analysis.
+  #
+  # Args:
+  #   data: Data.table or vector file with character strings.
+  #   out: location and filename for the .peptide file.
+  #   remove1: "character" that should be filtered out of the vector.
+  #   remove2: "character" that should be filtered out of the vector.
+  #
+  # Returns:
+  #   saves a .txt file with newline delimited of unique character strings from
+  #   the vector x.
+  res <- unique(data[!is.na(data) & !data %in% c(remove1, remove2)])
+  write.table(x = res,
+    file = out,
+    quote = FALSE,
+    sep = sep,
+    row.names=FALSE,
+    col.names = FALSE)
 }
+
 
 
 # load in annotated whole exsome sequencing single nucleotide variation data.
@@ -226,9 +252,6 @@ for (i in seq_along(AAdata[,1])) {
   }
 
 
-
-
-
 eightmers <- mapply(Ncharextract,
   AAdata[, 11],
   n = 8,
@@ -256,35 +279,14 @@ tenmers <- mapply(Ncharextract,
   replace = TRUE
   )
 
+AAdata2 <- cbind(AAdata, eightmers, ninemers, tenmers)
 
+write.csv(AAdata2,
+  file = "/home/christian/Documents/GitHub/gits/DT6606_renato_NetpanMHC_results.csv")
 
-UniproteinQC <- function (data, data2, seqcol, loc, expectedAA){
-  # quality control function that checks if the the protein sequence was
-  # successfully found and if the expected amino acid is in the right place.
-  #
-  # Args:
-  #   data: Data.table with protein names, extracted refseq IDs, Uniprot IDs
-  #         and protein sequences.
-  #   data2: Initial VCF or .tsv data containing the CNV and annotation.
-  #   seqcol: column in data containing the protein sequences.
-  #   loc: column in data containing the mutation site.
-  #
-  # Returns:
-  #   A revised data.table with adjusted protein sequences where previously
-  #   sequences were missing or incorrect.
-  for (i in seq(along = data)) {
-
-    if (is.na(AAdata[i,seqcol])){ #  first attempt to resolve all NA sequences.
-
-    }
-    # subsequently check if found protein sequences contain the expected AA.
-}
-
-
-write.csv(x=AAdata2,file = "~/Documents/MHC_neoantigen_select_WES/DT6606_renato_NetpanMHC.csv", row.names = F, col.names = T)
-
-
-#filter rout unreviewed sequences:
-dat <- fread("~/Documents/MHC_neoantigen_select_WES/DT6606_renato_NetpanMHC.csv")
-rev_dat <- dat[REVIEWED == "reviewed" & !is.na(SEQUENCE)]
-write.csv(x=AAdata2, file= "~/Documents/MHC_neoantigen_select_WES/DT6606_renato_NetpanMHC_filtered.csv")
+# create the textfiles for netpanMHC scoring:
+formatmassager(data = unlist(eightmers),
+  out = "/home/christian/Documents/GitHub/gits/DT6606_renato_eightmer.txt",
+  sep ="",
+  remove1 = "incorrect mutation location or sequence",
+  remove2 = "Sequence too short")
