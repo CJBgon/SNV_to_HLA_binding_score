@@ -1,7 +1,27 @@
+#!/usr/bin/Rscript
+
+# Christian J Bouwens
+# 2019-06-13
+# Script that returns 8, 9 and 10mer peptides containing SNV from
+# a .vcf or .tsv file of single nucleotide variations from whole exsome
+# sequencing analysis.
+
+suppressPackageStartupMessages(library(optparse)) # don't say "Loading required package: optparse"
+# manual: http://cran.r-project.org/web/packages/optparse/optparse.pdf
+# vignette: http://www.icesi.edu.co/CRAN/web/packages/optparse/vignettes/optparse.pdf
 library(UniProt.ws)
 library(data.table)
 library(biomaRt)
 
+
+
+option_list = list(
+  make_option(c("-f", "--file"), action="store", default=NA, type='character',
+              help="location of the .vcf or .tsv file"),
+  make_option(c("-l", "--length"), action="store", default=NA, type='numeric',
+              help="length of of the VCF header. ")
+)
+opt = parse_args(OptionParser(option_list=option_list))
 
 rsubstr <- function(x,n) {
   # substring only works from left to right.
@@ -12,7 +32,7 @@ rsubstr <- function(x,n) {
 
 
 stringslider <- function(stri, l) {
-  # Returns a vector of unique strings of length l extracted from string tri
+  # Returns a vector of unique strings of length l extracted from string
   # works through a sliding window from left to right. Checks if each returned
   # string is of length l.
   #
@@ -78,7 +98,7 @@ Ncharextract <- function(x, n, loc, from, replace = TRUE, mut = "X") {
 
 
 formatmassager <- function (data, out, sep ="", remove1 = NULL,
-  remove2 = NULL){
+  remove2 = NULL, savetxt = TRUE){
   # A vector of short peptide sequences (8, 9 and 10 mers
   # and format them for netpanMHC analysis.
   #
@@ -87,27 +107,24 @@ formatmassager <- function (data, out, sep ="", remove1 = NULL,
   #   out: location and filename for the .peptide file.
   #   remove1: "character" that should be filtered out of the vector.
   #   remove2: "character" that should be filtered out of the vector.
-  #
+  #   savetxt: save the data.table as a .txt file? logical, default = TRUE
   # Returns:
   #   saves a .txt file with newline delimited of unique character strings from
   #   the vector x.
   res <- unique(data[!is.na(data) & !data %in% c(remove1, remove2)])
+  if (savetxt == TRUE) {
   write.table(x = res,
     file = out,
     quote = FALSE,
     sep = sep,
-    row.names=FALSE,
+    row.names = FALSE,
     col.names = FALSE)
+  }
+  return(res)
 }
 
 
-
-# load in annotated whole exsome sequencing single nucleotide variation data.
-read.table("~/Documents/GitHub/gits/DT6606_variants_sub.tsv",
-  sep = "\t",
-  fill = T)
-
-dat <- fread(file = "~/Documents/GitHub/gits/DT6606_variants_sub.tsv",
+dat <- fread(file = opt$f,
   sep2 = ";",
   fill = F,
   na.strings ="NA",
@@ -116,10 +133,9 @@ dat <- fread(file = "~/Documents/GitHub/gits/DT6606_variants_sub.tsv",
 # remove .VCF data in the first top 30 rows.
 # the length of these might differ depending on the pipeline used.
 # to do: give an optoin to either work with VCF or TSV/CSV files.
-usedat <- dat[ -(1:30)]
+usedat <- dat[ -(1:opt$l)]
 # gather nonsynonymous, exonic variations.
 nonsynonmut <- usedat[ExonicFunc.refGene == "nonsynonymous SNV"]
-
 
 # multiple NCBI gene variants and corresponding CNV location
 # are located in the same column, we extract the last 50 digits and stringsplit
@@ -165,7 +181,6 @@ to <- sapply(mut, function(x) {
   }
   , USE.NAMES = F)
 name <- unlist(dfaasplit[, 1], use.names = F)
-
 
 # select m. musculus uniprot datbase for AA sequence extraction.----
 mouseUp <- UniProt.ws(10090)
@@ -234,17 +249,9 @@ AAdata <- cbind(name,
   AAmat,
   stringsAsFactors = F)
 # end of uniprot query----
-
+AAdata
 # additional biomart query
 mart = useMart("ensembl", dataset="mmusculus_gene_ensembl")
-
-annot <- getBMlist(attributes =
-  "ensembl_gene_id",
-  "refseq_mrna",
-  "peptide",
-  filters = "refseq_mrna",
-  values  = NM,
-  mart = mart)
 
 # because the UNIprot ID does no always net a sequence we go over the mutations
 # again but query the refseq ID and otherwise the protein name.
@@ -307,12 +314,43 @@ tenmers <- mapply(Ncharextract,
 AAdata2 <- cbind(AAdata, eightmers, ninemers, tenmers)
 
 
-write.csv(AAdata2,
-  file = "/home/christian/Documents/GitHub/gits/DT6606_renato_NetpanMHC_results.csv")
-
 # create the textfiles for netpanMHC scoring:
-formatmassager(data = unlist(eightmers),
-  out = "/home/christian/Documents/GitHub/gits/DT6606_renato_eightmer.txt",
-  sep ="",
-  remove1 = "incorrect mutation location or sequence",
+eightmersclean <- formatmassager(data = unlist(eightmers),
+  savetxt = FALSE,
+  remove1 = "Incorrect mutation location or sequence",
   remove2 = "Sequence too short")
+
+ninemersclean <- formatmassager(data = unlist(ninemers),
+  savetxt = FALSE,
+  remove1 = "Incorrect mutation location or sequence",
+  remove2 = "Sequence too short")
+
+tenmersclean <- formatmassager(data = unlist(tenmers),
+  savetxt = FALSE,
+  remove1 = "Incorrect mutation location or sequence",
+  remove2 = "Sequence too short")
+
+eightmerstrings <- mapply(stringslider, eightmersclean, 8, USE.NAMES=FALSE)
+ninemerstrings  <- mapply(stringslider, ninemersclean,  9, USE.NAMES=FALSE)
+tenmerstrings   <- mapply(stringslider, tenmersclean,   10, USE.NAMES=FALSE)
+
+write.table(x = unlist(eightmerstrings),
+  file = "/home/christian/Documents/GitHub/gits/DT6606_eightmer.txt",
+  quote = FALSE,
+  sep = "",
+  row.names = FALSE,
+  col.names = FALSE)
+
+write.table(x = unlist(ninemerstrings),
+  file = "/home/christian/Documents/GitHub/gits/DT6606_ninemer.txt",
+  quote = FALSE,
+  sep = "",
+  row.names = FALSE,
+  col.names = FALSE)
+
+write.table(x = unlist(tenmerstrings),
+  file = "/home/christian/Documents/GitHub/gits/DT6606_tenmer.txt",
+  quote = FALSE,
+  sep = "",
+  row.names = FALSE,
+  col.names = FALSE)
