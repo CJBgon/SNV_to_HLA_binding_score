@@ -3,12 +3,37 @@ library(data.table)
 library(biomaRt)
 
 
-
 rsubstr <- function(x,n) {
   # substring only works from left to right.
   # this function grabs n characters from the end of the string.
 
   substring(x, nchar(x) - n + 1)
+}
+
+
+stringslider <- function(stri, l) {
+  # Returns a vector of unique strings of length l extracted from string tri
+  # works through a sliding window from left to right. Checks if each returned
+  # string is of length l.
+  #
+  # Args:
+  #   stri: A string from on which the extraction occurs.
+  #   l: length of the extracted strings.
+  #
+  # Returns:
+  #   A vector of extracted strings with length l.
+  strle <- nchar(stri)
+  i <- 1
+  subc <- c()
+
+  while (i + l - 1 <= strle) {
+    subc <- c(subc,
+      substr(stri,
+       start = i,
+       stop  = i + l - 1))
+   i <- i + 1
+  }
+  return(subc)
 }
 
 
@@ -280,6 +305,7 @@ tenmers <- mapply(Ncharextract,
   )
 
 AAdata2 <- cbind(AAdata, eightmers, ninemers, tenmers)
+
 
 write.csv(AAdata2,
   file = "/home/christian/Documents/GitHub/gits/DT6606_renato_NetpanMHC_results.csv")
