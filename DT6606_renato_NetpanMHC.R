@@ -16,12 +16,18 @@ library(biomaRt)
 
 
 option_list = list(
-  make_option(c("-f", "--file"), action="store", default=NA, type='character',
-              help="location of the .vcf or .tsv file"),
-  make_option(c("-l", "--length"), action="store", default=NA, type='numeric',
-              help="length of of the VCF header. ")
+  make_option(c("-f", "--file"),
+   action="store",
+   default=NA,
+   type='character',
+   help="location of the .vcf or .tsv file"),
+  make_option(c("-l", "--length"),
+   action="store",
+   default=NA,
+   type='numeric',
+   help="length (rows) of the VCF header.")
 )
-opt = parse_args(OptionParser(option_list=option_list))
+opt = parse_args(OptionParser(option_list = option_list))
 
 rsubstr <- function(x,n) {
   # substring only works from left to right.
@@ -97,7 +103,7 @@ Ncharextract <- function(x, n, loc, from, replace = TRUE, mut = "X") {
 }
 
 
-formatmassager <- function (data, out, sep ="", remove1 = NULL,
+formatmassager <- function (data, out, sep = "", remove1 = NULL,
   remove2 = NULL, savetxt = TRUE){
   # A vector of short peptide sequences (8, 9 and 10 mers
   # and format them for netpanMHC analysis.
@@ -108,6 +114,7 @@ formatmassager <- function (data, out, sep ="", remove1 = NULL,
   #   remove1: "character" that should be filtered out of the vector.
   #   remove2: "character" that should be filtered out of the vector.
   #   savetxt: save the data.table as a .txt file? logical, default = TRUE
+  #
   # Returns:
   #   saves a .txt file with newline delimited of unique character strings from
   #   the vector x.
@@ -122,7 +129,6 @@ formatmassager <- function (data, out, sep ="", remove1 = NULL,
   }
   return(res)
 }
-
 
 dat <- fread(file = opt$f,
   sep = "\t",
@@ -251,41 +257,41 @@ AAdata <- cbind(name,
   AAmat,
   stringsAsFactors = F)
 # end of uniprot query----
-AAdata
+
 # additional biomart query
 mart = useMart("ensembl", dataset="mmusculus_gene_ensembl")
 
 # because the UNIprot ID does no always net a sequence we go over the mutations
 # again but query the refseq ID and otherwise the protein name.
-for (i in seq_along(AAdata[,1])) {
-  # If there is no sequence (NA), search biomaRt for the refeseq sequence.
-  if (is.na(AAdata[i, 11])) {
-    martseq_nm <- getSequence(id = unlist(AAdata[i, 2], use.names = F),
+for (i in seq_along(6[, 1])) {
+  # check if the sequence is NA
+  if (is.na(AAdata[i, 11])) {  # if it is NA query the refseqRNA
+    martseq <- getSequence(id = unlist(AAdata[i, 2], use.names = F),
       type = "refseq_mrna",
       seqType = "peptide",
       mart = mart,
       verbose = F)
 
-      # If there is no sequence linked to the refseq id, try the  gene name.
-      if (is.na(martseq_nm[1, 1]) ||
-       martseq_nm == "Sequence unavailable"){
-        martseq_mgi <- getSequence(id = unlist(AAdata[i, 1], use.names = F),
-          type = "mgi_symbol",
-          seqType = "peptide",
-          mart = mart)
+    if (is.na(martseq[1, 1]) ||  # if no refseqrna sequence try gene name
+      martseq == "Sequence unavailable" ||
+      is.null(martseq[1, 1])) {
+      martseq <- getSequence(id = unlist(AAdata[i, 1], use.names = F),
+        type = "mgi_symbol",
+        seqType = "peptide",
+        mart = mart)
 
-          # if martseq mgi does not return NA or Sequence unavailable or is not null use it.
-          if(!is.na(martseq_mgi[1, 1]) ||
-          martseq_mgi[1, 1] != "Sequence unavailable" ||
-          !is.null(martseq_mgi){
-            AAdata[i, 11] <- unlist(martseq_mgi[1, 1], use.names = F)
-          }
-      }else{
-        AAdata[i, 11] <- unlist(martseq_nm[1, 1], use.names = F)
+        if(is.na(martseq[1, 1]) ||  # if no gene name sequence:
+          martseq == "Sequence unavailable" ||
+          is.null(martseq[1, 1])) {
+            matseq <- "Sequence unavailable"
       }
-    }
+    }  # replace the NA with either the sequence or Sequence unavailable.
+    AAdata[i, 11] <- unlist(martseq[1, 1], use.names = F)
   }
+}
 
+# (TODO): rewrite for loop, subset all NA rows, getBM as bulk over refseq
+#         and symbol name. following this match and append original data.
 
 eightmers <- mapply(Ncharextract,
   AAdata[, 11],
