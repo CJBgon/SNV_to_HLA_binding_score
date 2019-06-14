@@ -125,11 +125,13 @@ formatmassager <- function (data, out, sep ="", remove1 = NULL,
 
 
 dat <- fread(file = opt$f,
+  sep = "\t",
   sep2 = ";",
-  fill = F,
+  fill = T,
   na.strings ="NA",
   check.names = T,
   header = T)
+
 # remove .VCF data in the first top 30 rows.
 # the length of these might differ depending on the pipeline used.
 # to do: give an optoin to either work with VCF or TSV/CSV files.
@@ -272,9 +274,10 @@ for (i in seq_along(AAdata[,1])) {
           seqType = "peptide",
           mart = mart)
 
-          # if neither are available return Sequence unavailable
+          # if martseq mgi does not return NA or Sequence unavailable or is not null use it.
           if(!is.na(martseq_mgi[1, 1]) ||
-          martseq_mgi[1, 1] != "Sequence unavailable"){
+          martseq_mgi[1, 1] != "Sequence unavailable" ||
+          !is.null(martseq_mgi){
             AAdata[i, 11] <- unlist(martseq_mgi[1, 1], use.names = F)
           }
       }else{
