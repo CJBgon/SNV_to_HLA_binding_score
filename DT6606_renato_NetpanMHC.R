@@ -6,7 +6,8 @@
 # a .vcf or .tsv file of single nucleotide variations from whole exsome
 # sequencing analysis.
 
-suppressPackageStartupMessages(library(optparse)) # don't say "Loading required package: optparse"
+suppressPackageStartupMessages(library(optparse))
+# don't say "Loading required package: optparse"
 # manual: http://cran.r-project.org/web/packages/optparse/optparse.pdf
 # vignette: http://www.icesi.edu.co/CRAN/web/packages/optparse/vignettes/optparse.pdf
 library(UniProt.ws)
@@ -130,7 +131,7 @@ formatmassager <- function (data, out, sep = "", remove1 = NULL,
   return(res)
 }
 
-dat <- fread(file = opt$f,
+dat <- fread(file = "/home/christian/Documents/GitHub/gits/DT6606_variants_sub.tsv",  #opt$f
   sep = "\t",
   sep2 = ";",
   fill = T,
@@ -141,19 +142,9 @@ dat <- fread(file = opt$f,
 # remove .VCF data in the first top 30 rows.
 # the length of these might differ depending on the pipeline used.
 # to do: give an optoin to either work with VCF or TSV/CSV files.
-usedat <- dat[ -(1:opt$l)]
+usedat <- dat[ -(1:30)]  #opt$l
 # gather nonsynonymous, exonic variations.
 nonsynonmut <- usedat[ExonicFunc.refGene == "nonsynonymous SNV"]
-
-# multiple NCBI gene variants and corresponding CNV location
-# are located in the same column, we extract the last 50 digits and stringsplit
-# this the final reference and mutation are available.
-# TO DO: grab all combinations and use those downstream in case no sequence and
-# AA can be found for the first reference in the UniProt database.
-AAmutsmall <- nonsynonmut[, sub(x = AAChange.refGene,
-  replacement = "",
-  pattern = ".*(?=.{50}$)",
-  perl = T)]
 
 # We take all NM options and locations per SNV
 # While this might increase computational cost we don't need to run a loop to
@@ -292,6 +283,32 @@ for (i in seq_along(6[, 1])) {
 
 # (TODO): rewrite for loop, subset all NA rows, getBM as bulk over refseq
 #         and symbol name. following this match and append original data.
+
+# get all rows with NA sequences.
+naAAdata <- AAdata[unlist(is.na(AAdata[, 11]), use.names = FALSE),]
+
+martseq <- getSequence(id = unlist(naAAdata[, 2], use.names = F),
+  type = "refseq_mrna",
+  seqType = "peptide",
+  mart = mart,
+  verbose = F)
+
+naAAdata[match(martseq[, 2], naAAdata[, 2]), 11] <- martseq[, 1]
+
+naAAdata2 <- naAAdata[unlist(is.na(naAAdata[, 11]), use.names = FALSE),]
+
+martseq_mgi <- getSequence(id = unlist(naAAdata2[, 1], use.names = F),
+  type = "mgi_symbol",
+  seqType = "peptide",
+  mart = mart,
+  verbose = F)
+
+ # (TODO): Chris, this biomaRt query returns them in a random order,
+ # which makes it so unless we query individually,
+ # we cant see the differences between genen names
+match(martseq_mgi[, 2], naAAdata2[,1])
+
+
 
 eightmers <- mapply(Ncharextract,
   AAdata[, 11],
