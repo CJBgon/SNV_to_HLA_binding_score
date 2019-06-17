@@ -277,7 +277,7 @@ for (i in seq_along(AAdata[,1])) {
           # if martseq mgi does not return NA or Sequence unavailable or is not null use it.
           if(!is.na(martseq_mgi[1, 1]) ||
           martseq_mgi[1, 1] != "Sequence unavailable" ||
-          !is.null(martseq_mgi){
+          !is.null(martseq_mgi)) {
             AAdata[i, 11] <- unlist(martseq_mgi[1, 1], use.names = F)
           }
       }else{
