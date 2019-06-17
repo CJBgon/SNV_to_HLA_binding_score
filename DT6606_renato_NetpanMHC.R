@@ -103,6 +103,78 @@ Ncharextract <- function(x, n, loc, from, replace = TRUE, mut = "X") {
   }
 }
 
+seqchecking <- function(gene, loc, from, seqdata,
+  namecol = "V1", seqcol = "V2") {
+  # Checks if the a gene name and expected amino acid are in one or more
+  # of the sequences provided.
+  #
+  # Args:
+  #   gene: Gene name of interest. e.g.: "KRAS"
+  #   loc: location of the expected amino acid. e.g.: 12 in G12D.
+  #   from: expected amino acid in sequence, upper case single letter annot.
+  #         "G" in G12D.
+  #   seq: Data frame with names and sequences that should be checked.
+  #   namecol: name of the column containing gene names in seq. (default = "V1")
+  #   seqcol: name of the column containing the peptide sequences in
+  #         seq. (default = "V2")
+  #
+  # Returns:
+  #   A vector with sequences that fit the gene name and expected AA.
+  library(data.table)
+
+  if (!is.data.table(seqdata)){
+   seqdataDT <- as.data.table(seqdata)
+  }
+
+  if (is.na(gene) || is.null(gene)){
+    stop("please enter a valid gene name.")
+  } else if (gene %in% unlist(seqdataDT[,get(namecol)])) {
+    sequence <-
+      unlist(seqdataDT[get(namecol) == gene, get(seqcol)], use.names = F)
+  } else{sequence <- NA}
+
+  returnseq <- c()
+  for (i in sequence) {
+    if (is.na(i)) {
+      returnseq <- c(returnseq, NA)
+    }else if(substring(i, first = loc, last = loc) == from) {
+      returnseq <- c(returnseq, i)
+    }else{returnseq <- c(returnseq, NA)}
+  }
+  return(returnseq)
+}
+
+seqselect <- function(seqvector) {
+ # filters NA elements and selects the first element out of a
+ # list of multiple choices per element i.
+ #
+ # Args:
+ #    seqvector: an list containing NA and sequences.
+ #
+ #Returns: A vector of single elements extracted from seqvector. Returns NA if
+ #    there was no element to extract or if the only option was NA.
+ #
+ #
+ #
+ select <-c()
+  for (i in seq_along(seqvector)) {
+    narem <- c()
+    if (length(seqvector[[i]]) == 1){
+      select <- c(select, seqvector[[i]])
+
+    }else if (length(seqvector[[i]]) >= 2){
+
+      narem <- seqvector[[i]][!is.na(seqvector[[i]])]
+
+      if(is.null(narem) || length(narem) <1) {
+        select <- c(select, NA)
+      }else{ select <- c(select, narem[1])}
+    }else{select <- c(select, NA)}
+  }
+  return(select)
+}
+
+
 
 formatmassager <- function (data, out, sep = "", remove1 = NULL,
   remove2 = NULL, savetxt = TRUE){
@@ -131,7 +203,7 @@ formatmassager <- function (data, out, sep = "", remove1 = NULL,
   return(res)
 }
 
-dat <- fread(file = "/home/christian/Documents/GitHub/gits/DT6606_variants_sub.tsv",  #opt$f
+dat <- fread(file = opt$f,
   sep = "\t",
   sep2 = ";",
   fill = T,
@@ -142,7 +214,7 @@ dat <- fread(file = "/home/christian/Documents/GitHub/gits/DT6606_variants_sub.t
 # remove .VCF data in the first top 30 rows.
 # the length of these might differ depending on the pipeline used.
 # to do: give an optoin to either work with VCF or TSV/CSV files.
-usedat <- dat[ -(1:30)]  #opt$l
+usedat <- dat[ -(1:opt$l)]  #opt$l
 # gather nonsynonymous, exonic variations.
 nonsynonmut <- usedat[ExonicFunc.refGene == "nonsynonymous SNV"]
 
@@ -254,92 +326,110 @@ mart = useMart("ensembl", dataset="mmusculus_gene_ensembl")
 
 # because the UNIprot ID does no always net a sequence we go over the mutations
 # again but query the refseq ID and otherwise the protein name.
-for (i in seq_along(6[, 1])) {
-  # check if the sequence is NA
-  if (is.na(AAdata[i, 11])) {  # if it is NA query the refseqRNA
-    martseq <- getSequence(id = unlist(AAdata[i, 2], use.names = F),
-      type = "refseq_mrna",
-      seqType = "peptide",
-      mart = mart,
-      verbose = F)
+# which makes it so unless we query individually,
+# we cant see the differences between genen names
+# for now we will use the funciton nm_seqchecked to get sequences
+# that have the expected aminoacid and gene name to match the querried
+# peptide sequence to the mutation in the VCF/TSV file.
 
-    if (is.na(martseq[1, 1]) ||  # if no refseqrna sequence try gene name
-      martseq == "Sequence unavailable" ||
-      is.null(martseq[1, 1])) {
-      martseq <- getSequence(id = unlist(AAdata[i, 1], use.names = F),
-        type = "mgi_symbol",
-        seqType = "peptide",
-        mart = mart)
+ # 1. remove get dataframe_NA and dataframe 1.
+naAAdata <- AAdata[unlist(is.na(AAdata[, 11]), use.names = FALSE),]
+valAAdata <- AAdata[!unlist(is.na(AAdata[, 11]), use.names = FALSE),]
 
-        if(is.na(martseq[1, 1]) ||  # if no gene name sequence:
-          martseq == "Sequence unavailable" ||
-          is.null(martseq[1, 1])) {
-            matseq <- "Sequence unavailable"
-      }
-    }  # replace the NA with either the sequence or Sequence unavailable.
-    AAdata[i, 11] <- unlist(martseq[1, 1], use.names = F)
-  }
+ # 2. query dataframe_NA for refeseq peptide.
+martseq <- getSequence(id = unlist(naAAdata[, 2], use.names = F),
+   type = "refseq_mrna",
+   seqType = "peptide",
+   mart = mart,
+   verbose = F)
+
+ # 3. check which refseq hits match using seqchecking.
+ # append those to dataframe 1.
+nm_seqchecked <-
+ mapply(seqchecking,
+   gene = naAAdata[, 2],
+   loc = naAAdata[, 6],
+   from = naAAdata[, 4],
+   MoreArgs = list(
+   seqdata = martseq,
+   namecol = "refseq_mrna",
+   seqcol = "peptide")
+ )
+
+nm_seq_selected <- seqselect(nm_seqchecked)
+for (i in seq_along(nm_seq_selected)) {
+  naAAdata[i,11] <- nm_seq_selected[i]
 }
 
-# (TODO): rewrite for loop, subset all NA rows, getBM as bulk over refseq
-#         and symbol name. following this match and append original data.
+ # 4. for the hits that dont match (including still NA) check on mgi_symbol.
+naAAdata2 <- naAAdata[unlist(is.na(naAAdata[, 11]), use.names = F),]
+val_naAAdata <- naAAdata[!unlist(is.na(naAAdata[, 11]), use.names = F),]
 
-# get all rows with NA sequences.
-naAAdata <- AAdata[unlist(is.na(AAdata[, 11]), use.names = FALSE),]
+martseq_mgi <- getSequence(id = unlist(naAAdata[, 1], use.names = F),
+   type = "mgi_symbol",
+   seqType = "peptide",
+   mart = mart,
+   verbose = F)
 
-martseq <- getSequence(id = unlist(naAAdata[, 2], use.names = F),
-  type = "refseq_mrna",
-  seqType = "peptide",
-  mart = mart,
-  verbose = F)
+mgi_seqchecked <-
+mapply(seqchecking,
+  gene = naAAdata2[, 1],
+  loc = naAAdata2[, 6],
+  from = naAAdata2[, 4],
+  MoreArgs = list(
+  seqdata = martseq_mgi,
+  namecol = "mgi_symbol",
+  seqcol = "peptide")
+)
 
-naAAdata[match(martseq[, 2], naAAdata[, 2]), 11] <- martseq[, 1]
+mgi_seq_selected <- seqselect(mgi_seqchecked)
+for (i in seq_along(mgi_seq_selected)) {
+naAAdata2[i,11] <- mgi_seq_selected[i]
+}
 
-naAAdata2 <- naAAdata[unlist(is.na(naAAdata[, 11]), use.names = FALSE),]
-
-martseq_mgi <- getSequence(id = unlist(naAAdata2[, 1], use.names = F),
-  type = "mgi_symbol",
-  seqType = "peptide",
-  mart = mart,
-  verbose = F)
-
- # (TODO): Chris, this biomaRt query returns them in a random order,
- # which makes it so unless we query individually,
- # we cant see the differences between genen names
-match(martseq_mgi[, 2], naAAdata2[,1])
+ # 5. append after seqchecking and place the remaining NAs in a seperate file.
+naAAdata2_2 <-naAAdata2[unlist(is.na(naAAdata2[, 11]), use.names = F),]
+val_naAAdata2 <- naAAdata2[!unlist(is.na(naAAdata2[, 11]), use.names = F),]
 
 
+AAdata_fin<- rbind(valAAdata, val_naAAdata, val_naAAdata2)
+naAAdata_excluded <- naAAdata2_2
+
+write.csv(naAAdata_excluded,
+  file = "/home/max/Documents/GitHub/gits/excluded_mut.csv")
 
 eightmers <- mapply(Ncharextract,
-  AAdata[, 11],
+  AAdata_fin[, 11],
   n = 8,
-  loc = AAdata[, 6],
-  from = AAdata[, 4],
-  mut = AAdata[, 5],
+  loc = AAdata_fin[, 6],
+  from = AAdata_fin[, 4],
+  mut = AAdata_fin[, 5],
   replace = TRUE
   )
 
 ninemers <- mapply(Ncharextract,
-  AAdata[, 11],
+  AAdata_fin[, 11],
   n = 9,
-  loc = AAdata[, 6],
-  from = AAdata[, 4],
-  mut = AAdata[, 5],
+  loc = AAdata_fin[, 6],
+  from = AAdata_fin[, 4],
+  mut = AAdata_fin[, 5],
   replace = TRUE
   )
 
 tenmers <- mapply(Ncharextract,
-  AAdata[, 11],
+  AAdata_fin[, 11],
   n = 10,
-  loc = AAdata[, 6],
-  from = AAdata[, 4],
-  mut = AAdata[, 5],
+  loc = AAdata_fin[, 6],
+  from = AAdata_fin[, 4],
+  mut = AAdata_fin[, 5],
   replace = TRUE
   )
 
-AAdata2 <- cbind(AAdata, eightmers, ninemers, tenmers)
+AAdata_fin2 <- cbind(AAdata_fin, eightmers, ninemers, tenmers)
+write.csv(AAdata_fin2,
+file = "/home/max/Documents/GitHub/gits/AA_peptides_mutations.csv")
 
-
+#which refseq hits match using
 # create the textfiles for netpanMHC scoring:
 eightmersclean <- formatmassager(data = unlist(eightmers),
   savetxt = FALSE,
@@ -361,21 +451,21 @@ ninemerstrings  <- mapply(stringslider, ninemersclean,  9, USE.NAMES=FALSE)
 tenmerstrings   <- mapply(stringslider, tenmersclean,   10, USE.NAMES=FALSE)
 
 write.table(x = unlist(eightmerstrings),
-  file = "/home/christian/Documents/GitHub/gits/DT6606_eightmer.txt",
+  file = "/home/max/Documents/GitHub/gits/DT6606_eightmer.txt",
   quote = FALSE,
   sep = "",
   row.names = FALSE,
   col.names = FALSE)
 
 write.table(x = unlist(ninemerstrings),
-  file = "/home/christian/Documents/GitHub/gits/DT6606_ninemer.txt",
+  file = "/home/max/Documents/GitHub/gits/DT6606_ninemer.txt",
   quote = FALSE,
   sep = "",
   row.names = FALSE,
   col.names = FALSE)
 
 write.table(x = unlist(tenmerstrings),
-  file = "/home/christian/Documents/GitHub/gits/DT6606_tenmer.txt",
+  file = "/home/max/Documents/GitHub/gits/DT6606_tenmer.txt",
   quote = FALSE,
   sep = "",
   row.names = FALSE,

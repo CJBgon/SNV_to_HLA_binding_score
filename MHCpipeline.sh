@@ -10,11 +10,13 @@ cd /home/max/Documents/GitHub/gits
 cd ../
 #run the netpanMHC script
 
-netMHC -a H-2-Db -f /home/max/Documents/GitHub/gits/DT6606_eightmer.txt -p -l 8 -xls -xlsfile /home/max/Documents/GitHub/gits/NETPAN_Db_eightmer.xls
-netMHC -a H-2-Kb -f /home/max/Documents/GitHub/gits/DT6606_eightmer.txt -p -l 8 -xls -xlsfile /home/max/Documents/GitHub/gits/NETPAN_Kb_eightmer.xls
+cd /home/max/Documents/MHC_neoantigen_select_WES/netMHCpan-4.0
 
-netMHC -a H-2-Db -f /home/max/Documents/GitHub/gits/DT6606_ninemer.txt -p -l 9 -xls -xlsfile /home/max/Documents/GitHub/gits/NETPAN_Db_ninemer.xls
-netMHC -a H-2-Kb -f /home/max/Documents/GitHub/gits/DT6606_ninemer.txt -p -l 9 -xls -xlsfile /home/max/Documents/GitHub/gits/NETPAN_Kb_ninemer.xls
+/home/max/Documents/MHC_neoantigen_select_WES/netMHCpan-4.0/netMHCpan -a H2-Db -f /home/max/Documents/GitHub/gits/DT6606_eightmer.txt -p -l 8 -xls -xlsfile /home/max/Documents/GitHub/gits/NETPAN_Db_eightmer.xls
+/home/max/Documents/MHC_neoantigen_select_WES/netMHCpan-4.0/netMHCpan -a H2-Kb -f /home/max/Documents/GitHub/gits/DT6606_eightmer.txt -p -l 8 -xls -xlsfile /home/max/Documents/GitHub/gits/NETPAN_Kb_eightmer.xls
 
-netMHC -a H-2-Db -f /home/max/Documents/GitHub/gits/DT6606_tenmer.txt -p -l 10 -xls -xlsfile /home/max/Documents/GitHub/gits/NETPAN_Db_tenmer.xls
-netMHC -a H-2-Kb -f /home/max/Documents/GitHub/gits/DT6606_tenmer.txt -p -l 10 -xls -xlsfile /home/max/Documents/GitHub/gits/NETPAN_Kb_tenmer.xls
+/home/max/Documents/MHC_neoantigen_select_WES/netMHCpan-4.0/netMHCpan -a H2-Db -f /home/max/Documents/GitHub/gits/DT6606_ninemer.txt -p -l 9 -xls -xlsfile /home/max/Documents/GitHub/gits/NETPAN_Db_ninemer.xls
+/home/max/Documents/MHC_neoantigen_select_WES/netMHCpan-4.0/netMHCpan -a H2-Kb -f /home/max/Documents/GitHub/gits/DT6606_ninemer.txt -p -l 9 -xls -xlsfile /home/max/Documents/GitHub/gits/NETPAN_Kb_ninemer.xls
+
+/home/max/Documents/MHC_neoantigen_select_WES/netMHCpan-4.0/netMHCpan -a H2-Db -f /home/max/Documents/GitHub/gits/DT6606_tenmer.txt -p -l 10 -xls -xlsfile /home/max/Documents/GitHub/gits/NETPAN_Db_tenmer.xls
+/home/max/Documents/MHC_neoantigen_select_WES/netMHCpan-4.0/netMHCpan -a H2-Kb -f /home/max/Documents/GitHub/gits/DT6606_tenmer.txt -p -l 10 -xls -xlsfile /home/max/Documents/GitHub/gits/NETPAN_Kb_tenmer.xls
