@@ -3,17 +3,14 @@
 # Christian J Bouwens
 # 2019-06-13
 # Script that returns 8, 9 and 10mer peptides containing SNV from
-# a .vcf or .tsv file of single nucleotide variations from whole exsome
+# a .vcf or .tsv file of single nucleotide variations from whole exome
 # sequencing analysis.
 
 suppressPackageStartupMessages(library(optparse))
-# don't say "Loading required package: optparse"
 # manual: http://cran.r-project.org/web/packages/optparse/optparse.pdf
-# vignette: http://www.icesi.edu.co/CRAN/web/packages/optparse/vignettes/optparse.pdf
 library(UniProt.ws)
 library(data.table)
 library(biomaRt)
-
 
 
 option_list = list(
@@ -30,6 +27,8 @@ option_list = list(
 )
 opt = parse_args(OptionParser(option_list = option_list))
 
+
+#functions
 rsubstr <- function(x,n) {
   # substring only works from left to right.
   # this function grabs n characters from the end of the string.
@@ -103,6 +102,7 @@ Ncharextract <- function(x, n, loc, from, replace = TRUE, mut = "X") {
   }
 }
 
+
 seqchecking <- function(gene, loc, from, seqdata,
   namecol = "V1", seqcol = "V2") {
   # Checks if the a gene name and expected amino acid are in one or more
@@ -144,6 +144,7 @@ seqchecking <- function(gene, loc, from, seqdata,
   return(returnseq)
 }
 
+
 seqselect <- function(seqvector) {
  # filters NA elements and selects the first element out of a
  # list of multiple choices per element i.
@@ -175,7 +176,6 @@ seqselect <- function(seqvector) {
 }
 
 
-
 formatmassager <- function (data, out, sep = "", remove1 = NULL,
   remove2 = NULL, savetxt = TRUE){
   # A vector of short peptide sequences (8, 9 and 10 mers
@@ -203,6 +203,7 @@ formatmassager <- function (data, out, sep = "", remove1 = NULL,
   return(res)
 }
 
+
 dat <- fread(file = opt$f,
   sep = "\t",
   sep2 = ";",
@@ -211,7 +212,7 @@ dat <- fread(file = opt$f,
   check.names = T,
   header = T)
 
-# remove .VCF data in the first top 30 rows.
+# remove .VCF annotation data in the top rows,
 # the length of these might differ depending on the pipeline used.
 # to do: give an optoin to either work with VCF or TSV/CSV files.
 usedat <- dat[ -(1:opt$l)]  #opt$l
@@ -429,7 +430,6 @@ AAdata_fin2 <- cbind(AAdata_fin, eightmers, ninemers, tenmers)
 write.csv(AAdata_fin2,
 file = "/home/max/Documents/GitHub/gits/AA_peptides_mutations.csv")
 
-#which refseq hits match using
 # create the textfiles for netpanMHC scoring:
 eightmersclean <- formatmassager(data = unlist(eightmers),
   savetxt = FALSE,
