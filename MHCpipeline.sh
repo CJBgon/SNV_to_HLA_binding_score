@@ -2,10 +2,10 @@
 export PATH=/home/max/Documents/MHC_neoantigen_select_WES:$PATH
 export PATH=$PATH:/usr/bin/Rscript
 # run the R script DT6606_renato_NetpanMHC.R with the VCF file as variable.
-chmod +x /home/max/Documents/GitHub/gits/DT6606_renato_NetpanMHC.R
+chmod +x /home/max/Documents/GitHub/gits/variantstopeptides.R
 
 cd /home/max/Documents/GitHub/gits
-./DT6606_renato_NetpanMHC.R -f /home/max/NGS/Blood_Renato_DT6606_WES/variant_calling/blood_SNP_calling.Somatic.hc.mm10_multianno -l 30
+./variantstopeptides.R -f /home/max/NGS/Blood_Renato_DT6606_WES/variant_calling/blood_SNP_calling.Somatic.hc.mm10_multianno -l 30
 
 cd ../
 #run the netpanMHC script
