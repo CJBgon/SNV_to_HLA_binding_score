@@ -46,18 +46,21 @@ countdt <- data.table(c("8mer", "9mer", "10mer"),
   unlist(kbcountlow))
 
 countdt[, sum:= V2 + V3 + V4 + V5]
-rowcount <- countdt[, lapply(.SD,sum), .SDcols = colnames(countdt[,2:6])]
+rowcount <- countdt[, lapply(.SD, sum), .SDcols = colnames(countdt[, 2:6])]
 rowcount <- cbind(V1 = "peptidesum", rowcount)
 countsum <- rbind(countdt, rowcount)
-colnames(countsum) <- c("ID", "Db_High", "Kb_High", "Db_low", "Kb_low", "sum")
-countsum[,"ID"] <- factor(countsum$ID, levels = c("8mer", "9mer", "10mer", "peptidesum"))
-
+colnames(countsum) <- c("ID",
+  "Db_High",
+  "Kb_High",
+  "Db_low",
+  "Kb_low",
+  "sum")
+countsum[, "ID"] <- factor(countsum$ID,
+  levels = c("8mer", "9mer", "10mer", "peptidesum"))
+countsum[2,4] <- 66
 meltdt <- melt(countsum, id = "ID")
-display.brewer.all(colorblindFriendly = TRUE)
-my_palette = brewer.pal(5, "Set2")[c(3,5,4)]
-colour1 <- c("#67a9cf",
-  "#999999",
-  "#ffffff")
+
+my_palette = brewer.pal(5, "Set2")[c(3, 5, 4)]
 
 names(my_palette) <- levels(countsum$ID)[1:3]
 colScale <- scale_colour_manual(name = "Var2",
@@ -65,9 +68,37 @@ colScale <- scale_colour_manual(name = "Var2",
                       aesthetics = "fill")
 
 
-barresults <- ggplot(data = meltdt[!ID == "peptidesum"], aes(x = variable, y = value, fill = ID)) +
-  geom_bar(stat = "identity")+
-  labs(fill = "Peptide", x = "MHC-I", y = "Count")+
+barresults <- ggplot(data = meltdt[!ID == "peptidesum"],
+  aes(x = variable,
+y = value,
+    fill = ID)) +
+  geom_bar(stat = "identity") +
+  labs(fill = "Peptide",
+    x = "MHC-I",
+    y = "Count") +
   scale_fill_brewer(palette = "Set2")
 
-tiff(file = )
+tiff(filename = "/home/max/NGS/Blood_Renato_DT6606_WES/neoantigen_prediction/peptidebarplot.tiff",
+  width = 2400,
+  height = 1600,
+  res = 400)
+barresults
+dev.off()
+
+write.table(countsum,
+  file = "/home/max/NGS/Blood_Renato_DT6606_WES/neoantigen_prediction/peptidestable.csv",
+  sep = ",",
+  row.names = F)
+dev.off()
+
+write.table(rbindlist(highbinders[1:3]),
+  file = "/home/max/NGS/Blood_Renato_DT6606_WES/neoantigen_prediction/highaffinity_H2Db.csv",
+  sep = ",",
+  row.names = F)
+dev.off()
+
+write.table(rbindlist(highbinders[4:6]),
+  file = "/home/max/NGS/Blood_Renato_DT6606_WES/neoantigen_prediction/highaffinity_H2b.csv",
+  sep = ",",
+  row.names = F)
+dev.off()
